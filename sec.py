@@ -1,31 +1,33 @@
 #!/usr/bin/python3
-"""Script designed to automate SSH connecting to network devices."""
-
 import sys
 import os
 import configparser
 import pexpect
-import subprocess
 
 
 def do_ssh(host, config):
 
     targ = "%s@%s" % (config["ini"][0], host)
     sess = pexpect.spawn("/usr/bin/ssh", [targ])
-    idx = sess.expect(["continue connecting", pexpect.EOF, pexpect.TIMEOUT], timeout=4)
+    idx = sess.expect(["continue connecting", pexpect.EOF, pexpect.TIMEOUT], timeout=1)
+
+    if idx == 1:
+        print("Unable to connect, please ensure hostname spelling is correct.")
+        sys.exit()
 
     if idx == 0:
         print("Accepting new host SSH Key...")
         sess.sendline("yes")
 
     try:
-        sess.expect("word:", timeout=4)
+        sess.expect("word:")
         sess.sendline(config["ini"][1])
 
-        en = sess.expect([">", "#"], timeout=2)
+        en = sess.expect([">", "#"])
 
         if en == 1:
-            print("Enable Mode Granted. Press Enter to continue...")
+            sess.sendline("\b")
+            print("\nConnected.")
 
         elif en == 0:
             sess.sendline("en")
@@ -40,18 +42,18 @@ def do_ssh(host, config):
         print("\nError: Unable to connect to %s via SSH\n" % host)
 
         if input("Do you wish to remove the old SSH key and try again? (y/n):") == "y":
-            remove_known_host_entry(host)
+
+            known_hosts_path = os.path.expanduser("~/.ssh/known_hosts")
+            remove_known_host_entry(known_hosts_path, host)
             return 1
 
         else:
             sys.exit("\nError: Unable to connect.\n")
 
 
-def remove_known_host_entry(host):
+def remove_known_host_entry(known_hosts_path, host):
 
     print("Attempting to remove ssh key and try again...")
-
-    known_hosts_path = os.path.expanduser("~/.ssh/known_hosts")
 
     with open(known_hosts_path, "r") as file:
         lines = file.readlines()
@@ -62,14 +64,6 @@ def remove_known_host_entry(host):
                 file.write(line)
 
     print("Old ssh key removed, trying again....\n")
-
-
-def ping(host):
-
-    print(f"Pinging {host}...")
-    command = ['ping', "-c", "2", host]
-
-    return subprocess.call(command, stdout=open(os.devnull, 'w')) == 0
 
 
 
@@ -85,15 +79,10 @@ def init(host):
             str(config["net"]["secret"])
             ]}
 
-    if ping(host):
-        print("Ping Successfull, connecting....")
+    con = do_ssh(host, config_v)
+
+    if con == 1:
         con = do_ssh(host, config_v)
-
-        if con == 1:
-            con = do_ssh(host, config_v)
-
-    else:
-        print("Ping Unsuccessfull, please check spelling of hostname.")
 
 
 
