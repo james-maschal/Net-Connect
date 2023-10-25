@@ -7,13 +7,9 @@ import pexpect
 
 def do_ssh(host, config):
 
-    targ = "%s@%s" % (config["ini"][0], host)
-    sess = pexpect.spawn("/usr/bin/ssh", [targ])
-    idx = sess.expect(["continue connecting", pexpect.EOF, pexpect.TIMEOUT], timeout=1)
+    sess = pexpect.spawn("/usr/bin/ssh", [f"{config['user']}@{host}"])
 
-    if idx == 1:
-        print("Unable to connect, please ensure hostname spelling is correct.")
-        sys.exit()
+    idx = sess.expect(["continue connecting", pexpect.EOF, pexpect.TIMEOUT], timeout=1)
 
     if idx == 0:
         print("Accepting new host SSH Key...")
@@ -21,7 +17,7 @@ def do_ssh(host, config):
 
     try:
         sess.expect("word:")
-        sess.sendline(config["ini"][1])
+        sess.sendline(config["pass"])
 
         en = sess.expect([">", "#"])
 
@@ -32,7 +28,7 @@ def do_ssh(host, config):
         elif en == 0:
             sess.sendline("en")
             sess.expect("word:")
-            sess.sendline(config["ini"][2])
+            sess.sendline(config["secret"])
 
         sess.interact()
 
@@ -51,16 +47,18 @@ def do_ssh(host, config):
             sys.exit("\nError: Unable to connect.\n")
 
 
+
 def remove_known_host_entry(known_hosts_path, host):
 
     print("Attempting to remove ssh key and try again...")
+    lower_host = host.lower()
 
     with open(known_hosts_path, "r") as file:
         lines = file.readlines()
 
     with open(known_hosts_path, "w") as file:
         for line in lines:
-            if not line.startswith(host):
+            if not line.startswith(lower_host):
                 file.write(line)
 
     print("Old ssh key removed, trying again....\n")
@@ -73,11 +71,10 @@ def init(host):
     config.read("info.ini")
 
     config_v = {
-        "ini" : [
-            str(config["net"]["username"]),
-            str(config["net"]["password"]),
-            str(config["net"]["secret"])
-            ]}
+            "user" : str(config["net"]["username"]),
+            "pass" : str(config["net"]["password"]),
+            "secret" : str(config["net"]["secret"])
+            }
 
     con = do_ssh(host, config_v)
 

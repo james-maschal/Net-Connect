@@ -9,7 +9,7 @@ import subprocess
 def init(host):
 
     ssh_command = f"ssh {host} | tee {host}_output.txt"
-    subprocess.run(ssh_command, shell=True)
+    subprocess.run(str(ssh_command), shell=True)
 
 
 
